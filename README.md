@@ -1,12 +1,12 @@
-# This project updates a database table daily energy consumption/production/import/export measured by a variety of devices.
+This project updates a database table daily energy consumption/production/import/export measured by a variety of devices.
 
-## Measurement devices include:
+### Measurement devices include:
 - Peacefair PZEM-004T via pico W
 - solarEdge via modbus/TCP
 
-## Devices monitored include:
+### Devices monitored include:
 - solar production
-- - home utility export
+- home utility export
 - home utility import
 - HVAC condenser consumption
 - HVAC evaporator consumption
