@@ -1,0 +1,19 @@
+Energy Logger Notes
+
+A database table is used to log daily energy consumption/production/import/export measured by a variety of devices.
+
+Measurement devices include:
+    - Peacefair via pico W
+    - solarEdge via modbus/TCP
+
+Devices monitored include:
+    - solar production
+    - home utility export
+    - home utility import
+    - HVAC condenser consumption
+    - HVAC evaporator consumption
+
+The database table will be updated daily at midnight with the following inforamtion:
+    - date
+    - measurement name
+    - measurement value
