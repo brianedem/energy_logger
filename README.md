@@ -1,4 +1,4 @@
-This project updates a database table daily energy consumption/production/import/export measured by a variety of devices.
+Triggered by cron, this project updates a database table daily energy consumption/production/import/export measured by a variety of devices.
 
 ### Measurement devices include:
 - Peacefair PZEM-004T via pico W
