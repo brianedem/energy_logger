@@ -1,0 +1,32 @@
+#!/bin/env python3
+
+import time
+import subprocess
+import sys
+
+# accounts:
+# power_update  for writing to database locally
+# power_view    for reading database, even remotely
+
+date = time.strftime('%Y-%m-%d')
+print(f'{date=}')
+
+db_command = ['mariadb','--user=power_update','-e','INSERT INTO daily_energy (day) VALUES ({date})','elpowerdb']
+insert_response = subprocess.run(
+    db_command,
+    capture_output=True)
+
+if insert_response != 0:
+    sys.exit(f'INSERT failed')
+
+wh_response = subprocess.run(
+    ['~/git/picow-peacefair/pp-read.py', 'waterheater.lan', 'energy'],
+    capture_output=True)
+
+c_response = subprocess.run(
+    ['~/git/picow-peacefair/pp-read.py', 'condenser.lan', 'energy'],
+    capture_output=True)
+
+e_response = subprocess.run(
+    ['~/git/picow-peacefair/pp-read.py', 'evaporator.lan', 'energy'],
+    capture_output=True)
