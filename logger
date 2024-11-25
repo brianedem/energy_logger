@@ -1,32 +1,98 @@
 #!/bin/env python3
 
+import logging
 import time
 import subprocess
 import sys
+import os
 
-# accounts:
+# database accounts:
 # power_update  for writing to database locally
 # power_view    for reading database, even remotely
 
-date = time.strftime('%Y-%m-%d')
+log = logging.getLogger(__name__)
+
+cwd = os.path.abspath('')
+pp_read = os.path.join(cwd, '../picow-peacefair/pp-read.py')
+
+modbus_solar = os.path.join(cwd, '..', 'modbus_solar')
+sEdge_python = os.path.join(modbus_solar, 'venv', 'bin', 'python')
+sEdge = os.path.join(modbus_solar, 'sEdge.py')
+
+# create a timestamp for yesterday as we are summerizing yesterday's usage
+date = (datetime.date.today()-datetime.timedelta(hours=12)).strftime('%Y-%m-%d')
 print(f'{date=}')
 
-db_command = ['mariadb','--user=power_update','-e','INSERT INTO daily_energy (day) VALUES ({date})','elpowerdb']
-insert_response = subprocess.run(
-    db_command,
-    capture_output=True)
+# INSERT the timestamp into the database; other fields will be NULL until later
+db_command = ['mariadb','--user=power_update','-e',f'INSERT INTO daily_energy (day) VALUES ("{date}")','elpowerdb']
+print(db_command)
+db_response = subprocess.run(db_command, capture_output=True)
 
-if insert_response != 0:
+if db_response.returncode != 0:
     sys.exit(f'INSERT failed')
 
-wh_response = subprocess.run(
-    ['~/git/picow-peacefair/pp-read.py', 'waterheater.lan', 'energy'],
-    capture_output=True)
+# readings are from either Peacefair devices or from the solar inverter
+# read the Peacefair devices first
+peacefair_list = {
+    'waterheater':  'waterheater.lan',
+    'condenser':    'condenser.lan',
+    'evaporator':   'evaporator.lan',
+}
 
-c_response = subprocess.run(
-    ['~/git/picow-peacefair/pp-read.py', 'condenser.lan', 'energy'],
-    capture_output=True)
+# peacefair meters read via a picow are read individually via HTTP
+for d in peacefair_list:
+    pf_command = [pp_read, peacefair_list[d], 'energy']
+    pf_response = subprocess.run(pf_command, capture_output=True)
+    if pf_response.returncode != 0:
+        log.warning(f'read from {d} failed')
+        continue
 
-e_response = subprocess.run(
-    ['~/git/picow-peacefair/pp-read.py', 'evaporator.lan', 'energy'],
-    capture_output=True)
+    value = pf_response.stdout.decode().strip()
+    print(f'{pf_response.stdout=}, {value=}')
+
+    db_command = ['mariadb', '--user=power_update', '-e',
+        f'UPDATE daily_energy SET {d}={value} WHERE day = "{date}"', 'elpowerdb']
+    print(db_command)
+    db_response = subprocess.run(db_command, capture_output=True)
+    if db_response.returncode!=0:
+        print(db_response.stdout, db_response.stderr)
+        log.warning(f'database UPDATE for {d} failed')
+
+# now the inverter values read via modbus/TCP
+sedge_list = {
+    'SE11400H.inverter.WH': 'solar_inv_pro',
+    'SE-RGMTR.ac_meter.TotWhImp': 'solar_inv_imp',
+    'SE-RGMTR.ac_meter.TotWhExp': 'solar_inv_exp',
+    'SE-MTR.ac_meter.TotWhImp': 'house_imp',
+    'SE-MTR.ac_meter.TotWhExp': 'house_exp',
+    }
+
+# the solar inverter provides several meters that can read in a single query
+se_command = [sEdge_python, sEdge] + list(sedge_list)
+se_response = subprocess.run(se_command, capture_output=True)
+if se_response.returncode != 0:
+    log.warning(f'reading solarEdge inverter failed')
+    sys.exit()
+
+# organize the responses as a list
+se_readings = se_response.stdout.decode().splitlines()
+if len(se_readings) < (len(sedge_list) + 1):
+    log.warning(f'sEdge response is less than expected')
+
+# verify the responses and create the SQL UPDATE SET parameters
+set_params = []
+for reading in se_readings:
+    if reading.endswith(' Wh'):
+        name,value,units = reading.split()
+        if name in sedge_list:
+            set_params.append(f'{sedge_list[name]}={value}')
+
+db_command = ['mariadb', '--user=power_update', '-e',
+    f'UPDATE daily_energy SET {','.join(set_params)} WHERE day="{date}"',
+    'elpowerdb']
+db_response = subprocess.run(db_command, capture_output=True)
+if db_response.returncode!=0:
+    print(db_response.stdout, db_response.stderr)
+    log.warning(f'database UPDATE for inverter values failed')
+
+sys.exit()
