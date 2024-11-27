@@ -2,37 +2,42 @@
 
 import logging
 import time
+import datetime
 import subprocess
 import sys
 import os
+import mariadb
 
 # database accounts:
 # power_update  for writing to database locally
 # power_view    for reading database, even remotely
 
 log = logging.getLogger(__name__)
-
-cwd = os.path.abspath('')
-pp_read = os.path.join(cwd, '../picow-peacefair/pp-read.py')
-
-modbus_solar = os.path.join(cwd, '..', 'modbus_solar')
-sEdge_python = os.path.join(modbus_solar, 'venv', 'bin', 'python')
-sEdge = os.path.join(modbus_solar, 'sEdge.py')
+logging.basicConfig(filename='energy_logger.logger.log', encoding='utf-8', level=logging.WARN)
 
 # create a timestamp for yesterday as we are summerizing yesterday's usage
 date = (datetime.date.today()-datetime.timedelta(hours=12)).strftime('%Y-%m-%d')
-print(f'{date=}')
+log.debug(f'{date=}')
 
 # INSERT the timestamp into the database; other fields will be NULL until later
-db_command = ['mariadb','--user=power_update','-e',f'INSERT INTO daily_energy (day) VALUES ("{date}")','elpowerdb']
-print(db_command)
-db_response = subprocess.run(db_command, capture_output=True)
+try:
+    mdb = mariadb.connect(user='power_update', database='elpowerdb')
+    mc = mdb.cursor()
+    sql = f'INSERT INTO daily_energy (day) VALUES ("{date}")'
+    log.debug(sql)
+    mc.execute(sql)
+except mariadb.Error as e:
+    log.exception(f'Error connecting to the database: {e}')
+    sys.exit(1)
 
-if db_response.returncode != 0:
-    sys.exit(f'INSERT failed')
+cwd = os.path.dirname(__file__)
+pp_read = os.path.join(cwd, '../picow-peacefair/pp-read.py')
+
+modbus_solar = os.path.join(cwd, 'modbus_solar')
+sEdge = os.path.join(modbus_solar, 'sEdge.py')
 
 # readings are from either Peacefair devices or from the solar inverter
-# read the Peacefair devices first
+# first read the Peacefair devices via HTTP/JSON
 peacefair_list = {
     'waterheater':  'waterheater.lan',
     'condenser':    'condenser.lan',
@@ -48,17 +53,18 @@ for d in peacefair_list:
         continue
 
     value = pf_response.stdout.decode().strip()
-    print(f'{pf_response.stdout=}, {value=}')
+    log.debug(f'{pf_response.stdout=}, {value=}')
 
-    db_command = ['mariadb', '--user=power_update', '-e',
-        f'UPDATE daily_energy SET {d}={value} WHERE day = "{date}"', 'elpowerdb']
-    print(db_command)
-    db_response = subprocess.run(db_command, capture_output=True)
-    if db_response.returncode!=0:
-        print(db_response.stdout, db_response.stderr)
-        log.warning(f'database UPDATE for {d} failed')
+    sql = f'UPDATE daily_energy SET {d}={value} WHERE day = "{date}"'
+    log.debug(sql)
+    try:
+        mc.execute(sql)
+    except mariadb.Error as e:
+        log.exception(f'Error updating {d} in database: {e}')
+        sys.exit(1)
+mdb.commit()
 
-# now the inverter values read via modbus/TCP
+# now read the inverter values via modbus/TCP
 sedge_list = {
     'SE11400H.inverter.WH': 'solar_inv_pro',
     'SE-RGMTR.ac_meter.TotWhImp': 'solar_inv_imp',
@@ -68,7 +74,7 @@ sedge_list = {
     }
 
 # the solar inverter provides several meters that can read in a single query
-se_command = [sEdge_python, sEdge] + list(sedge_list)
+se_command = ['venv/bin/python3', sEdge] + list(sedge_list)
 se_response = subprocess.run(se_command, capture_output=True)
 if se_response.returncode != 0:
     log.warning(f'reading solarEdge inverter failed')
@@ -87,12 +93,14 @@ for reading in se_readings:
         if name in sedge_list:
             set_params.append(f'{sedge_list[name]}={value}')
 
-db_command = ['mariadb', '--user=power_update', '-e',
-    f'UPDATE daily_energy SET {','.join(set_params)} WHERE day="{date}"',
-    'elpowerdb']
-db_response = subprocess.run(db_command, capture_output=True)
-if db_response.returncode!=0:
-    print(db_response.stdout, db_response.stderr)
-    log.warning(f'database UPDATE for inverter values failed')
+sql = f'UPDATE daily_energy SET {",".join(set_params)} WHERE day="{date}"'
+log.debug(sql)
+try:
+    mc.execute(sql)
+except mariadb.Error as e:
+    log.exception(f'Error updating inverter values in database: {e}')
+    sys.exit(1)
+else:
+    mdb.commit()
 
-sys.exit()
+sys.exit(0)
