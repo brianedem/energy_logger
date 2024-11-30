@@ -7,6 +7,7 @@ import subprocess
 import sys
 import os
 import mariadb
+import picow_peacefair.pp_read as pp
 
 # database accounts:
 # power_update  for writing to database locally
@@ -46,6 +47,7 @@ peacefair_list = {
 
 # peacefair meters read via a picow are read individually via HTTP
 for d in peacefair_list:
+    '''
     pf_command = [pp_read, peacefair_list[d], 'energy']
     pf_response = subprocess.run(pf_command, capture_output=True)
     if pf_response.returncode != 0:
@@ -53,7 +55,16 @@ for d in peacefair_list:
         continue
 
     value = pf_response.stdout.decode().strip()
+
     log.debug(f'{pf_response.stdout=}, {value=}')
+    '''
+    pf_response = pp.read_dev(peacefair_list[d])
+    if not pf_response or 'energy' not in pf_response:
+        log.warning(f'read from {d} failed')
+        continue
+    value = pf_response['energy']
+
+    log.debug(f'{pf_response=}, {value=}')
 
     sql = f'UPDATE daily_energy SET {d}={value} WHERE day = "{date}"'
     log.debug(sql)

@@ -1,3 +1,6 @@
 [submodule "modbus_solar"]
 	path = modbus_solar
 	url = http://github.com/brianedem/modbus_solar
+[submodule "picow_peacefair"]
+	path = picow_peacefair
+	url = https://github.com/brianedem/picow_peacefair

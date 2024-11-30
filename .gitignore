@@ -1,0 +1,6 @@
+# local items
+*.swp
+*.log
+
+# Environments
+venv/
