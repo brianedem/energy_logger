@@ -8,6 +8,7 @@ import sys
 import os
 import mariadb
 import picow_peacefair.pp_read as pp
+import modbus_solar.sEdge as se
 
 # database accounts:
 # power_update  for writing to database locally
@@ -47,17 +48,6 @@ peacefair_list = {
 
 # peacefair meters read via a picow are read individually via HTTP
 for d in peacefair_list:
-    '''
-    pf_command = [pp_read, peacefair_list[d], 'energy']
-    pf_response = subprocess.run(pf_command, capture_output=True)
-    if pf_response.returncode != 0:
-        log.warning(f'read from {d} failed')
-        continue
-
-    value = pf_response.stdout.decode().strip()
-
-    log.debug(f'{pf_response.stdout=}, {value=}')
-    '''
     pf_response = pp.read_dev(peacefair_list[d])
     if not pf_response or 'energy' not in pf_response:
         log.warning(f'read from {d} failed')
@@ -85,24 +75,33 @@ sedge_list = {
     }
 
 # the solar inverter provides several meters that can read in a single query
-se_command = ['venv/bin/python3', sEdge] + list(sedge_list)
-se_response = subprocess.run(se_command, capture_output=True)
-if se_response.returncode != 0:
-    log.warning(f'reading solarEdge inverter failed')
-    sys.exit()
+solar_edge_inverter_address = '192.168.12.186'          # TODO move to command line parameter?
+try:
+    system = se.sEdge(solar_edge_inverter_address, 1502)
+except RuntimeError as e:
+    log.exception('failed to connect to inverter')
+    sys.exit(1)
+points = {}
+for register in sedge_list:
+    (device, module, reg) = register.split('.', maxsplit=3)
+    try:
+        points[register] = se.point(system, device, module, reg)
+    except RuntimeError as e:
+        log.exception(f'failed to find register {register}')
+        continue
+try:
+    system.refresh_readings()
+except RuntimeError as e:
+    log.exception('Unable to fetch register data')
+    sys.exit(1)
 
-# organize the responses as a list
-se_readings = se_response.stdout.decode().splitlines()
-if len(se_readings) < (len(sedge_list) + 1):
-    log.warning(f'sEdge response is less than expected')
-
-# verify the responses and create the SQL UPDATE SET parameters
 set_params = []
-for reading in se_readings:
-    if reading.endswith(' Wh'):
-        name,value,units = reading.split()
-        if name in sedge_list:
-            set_params.append(f'{sedge_list[name]}={value}')
+for point in points:
+    value = points[point].read_point()[0]
+    if value is None:
+        log.error('unable to read data for {point}')
+        continue
+    set_params.append(f'{sedge_list[point]}={value}')
 
 sql = f'UPDATE daily_energy SET {",".join(set_params)} WHERE day="{date}"'
 log.debug(sql)
