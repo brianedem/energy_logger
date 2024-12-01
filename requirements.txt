@@ -1,0 +1,4 @@
+mariadb
+
+-r modbus_tcp/requirements.txt
+-r picow_peacefair/requirements.txt
