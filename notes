@@ -1,11 +1,11 @@
 Energy Logger Notes
 
-A database table is used to log daily energy consumption/production/import/export
-measured by a variety of devices.
+A database table is used to log energy consumption/production/import/export
+cumlative meter readings
 
 Measurement devices include:
-    - Peacefair via pico W web server
-    - solarEdge via modbus/TCP network connection
+    - Peacefair PZEM-004T via pico W configured as a web server
+    - SolarEdge via modbus/TCP network connection
 
 Devices monitored include:
     - solar production
@@ -13,11 +13,12 @@ Devices monitored include:
     - home utility import
     - HVAC condenser consumption
     - HVAC evaporator consumption
+    - waterheater consumption
 
 The database table includes the end-of-day date of the measurement (primary key) and a column for each
 measurement. Null values are used for readings that failed or have not yet been implemented.
 
 All measurements are in kWh.
 
-- Measurements from the Piecefair device are made using the pp-read.py application.
-- Measurements from the solarEdge inverter are made using th sEdge.py application.
+- Measurements from the Piecefair device are made using the pp-read.py module.
+- Measurements from the SolarEdge inverter are made using th sEdge.py module.
