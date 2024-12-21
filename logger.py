@@ -1,5 +1,6 @@
 #
 
+import argparse
 import logging
 import time
 import datetime
@@ -10,15 +11,20 @@ import mariadb
 import picow_peacefair.pp_read as pp
 import modbus_solar.sEdge as se
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--log", help="logfile location/name (default $CWD/energy_logger.log",
+    default='energy_logger.log')
+args = parser.parse_args()
+
 # database accounts:
 # power_update  for writing to database locally
 # power_view    for reading database, even remotely
 
 log = logging.getLogger(__name__)
-logging.basicConfig(filename='energy_logger.logger.log', encoding='utf-8', level=logging.WARN)
+logging.basicConfig(filename=args.log, encoding='utf-8', level=logging.WARN)
 
 # create a timestamp for yesterday as we are summerizing yesterday's usage
-date = (datetime.date.today()-datetime.timedelta(hours=12)).strftime('%Y-%m-%d')
+date = (datetime.datetime.today()-datetime.timedelta(hours=12)).strftime('%Y-%m-%d')
 log.debug(f'{date=}')
 
 # INSERT the timestamp into the database; other fields will be NULL until later
