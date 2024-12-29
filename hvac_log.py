@@ -36,9 +36,9 @@ args = parser.parse_args()
 # set up logging
 log = logging.getLogger(__name__)
 if args.debug:
-    logging.basicConfig(filename=args.log, encoding='utf-8', level=logging.WARN)
-else:
     logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(filename=args.log, encoding='utf-8', level=logging.WARN)
 
 # work around intermittent T-Moble DHCP problem
 # cache the address lookups here for later use while polling
@@ -53,7 +53,7 @@ for device in devices:
 # connect to the local Mariadb database where results are recorded
 if not macos:
     try:
-        mdb = mariadb.connect(user='power_update', database='hvac_power')
+        mdb = mariadb.connect(user='power_update', database='elpowerdb')
         mc = mdb.cursor()
     except mariadb.Error as e:
         log.exception(f'Error connecting to the database: {e}')
@@ -98,7 +98,7 @@ while True:
             energy = values['energy']
             if device in prev_energy:
                 delta_energy = energy - prev_energy[device]
-                insert_fields.append(device)
+                insert_fields.append(f'{device}_energy')
                 insert_values.append(f'{delta_energy:0.1f}')
             prev_energy[device] = energy
         else:
@@ -109,10 +109,10 @@ while True:
             insert_values.append(f'{temperature:0.1f}')
 
     if insert_fields:
-        insert_fields.append('day')
+        insert_fields.append('time')
         timestamp = target_time.strftime('%Y-%m-%d %H:%M:%S')
         insert_values.append(f'"{timestamp}"')
-        sql = f'INSERT INTO hvac_energy ({",".join(insert_fields)}) VALUES ({",".join(insert_values)});'
+        sql = f'INSERT INTO hvac_power ({",".join(insert_fields)}) VALUES ({",".join(insert_values)});'
         if not macos:
             try:
                 mc.execute(sql)
