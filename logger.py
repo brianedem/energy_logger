@@ -81,7 +81,7 @@ sedge_list = {
     }
 
 # the solar inverter provides several meters that can read in a single query
-solar_edge_inverter_address = '192.168.12.186'          # TODO move to command line parameter?
+solar_edge_inverter_address = '192.168.12.187'          # TODO move to command line parameter?
 try:
     system = se.sEdge(solar_edge_inverter_address, 1502)
 except RuntimeError as e:
