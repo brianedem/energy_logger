@@ -91,6 +91,7 @@ while True:
     insert_values = []
     for device in devices:
         values = pp.read_dev(addresses[device])
+        log.debug(values)
         if not values:
             log.warning(f'read from {device} failed')
             continue
@@ -99,7 +100,7 @@ while True:
             if device in prev_energy:
                 delta_energy = energy - prev_energy[device]
                 insert_fields.append(f'{device}_energy')
-                insert_values.append(f'{delta_energy:0.1f}')
+                insert_values.append(f'{delta_energy*1000:4.0f}')
             prev_energy[device] = energy
         else:
             log.warning(f'Missing energy value for {device}')
@@ -113,6 +114,8 @@ while True:
         timestamp = target_time.strftime('%Y-%m-%d %H:%M:%S')
         insert_values.append(f'"{timestamp}"')
         sql = f'INSERT INTO hvac_power ({",".join(insert_fields)}) VALUES ({",".join(insert_values)});'
+        log.debug(sql)
+            
         if not macos:
             try:
                 mc.execute(sql)
