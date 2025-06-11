@@ -1,11 +1,10 @@
 Energy Logger Notes
 
-A database table is used to log energy consumption/production/import/export
-cumlative meter readings
-
-Measurement devices include:
-    - Peacefair PZEM-004T via pico W configured as a web server
-    - SolarEdge via modbus/TCP network connection
+logger.py:
+The application is intended to run daily around midnight to collect cumulative energy
+consumption/production/import/export meter readings
+Readings are stored in the daily_energy table in the elpowerdb database on a local MariaDB server
+Accesses are made using the power_update user which has SELECT, INSERT, and UPDATE privileges.
 
 Devices monitored include:
     - solar production
@@ -15,6 +14,9 @@ Devices monitored include:
     - HVAC evaporator consumption
     - waterheater consumption
 
+Consumption measurements are made using a Peacefair PZEM-004T accessed via pico W configured as a web server
+Import/export/production measurements are collected from the SolarEdge inverter via modbus/TCP network connection
+
 The database table includes the end-of-day date of the measurement (primary key) and a column for each
 measurement. Null values are used for readings that failed or have not yet been implemented.
 
@@ -22,3 +24,14 @@ All measurements are in kWh.
 
 - Measurements from the Piecefair device are made using the pp-read.py module.
 - Measurements from the SolarEdge inverter are made using th sEdge.py module.
+
+
+The database table can be accessed remotely as the power_view user. Daily usage amounts can be determined
+by subtracting the previous day's value from the value at the day of interest.
+
+
+hvac_log.py:
+The application has to run continously, collecting outside temperature and energy consumption
+values from the HVAC condenser and evaporator energy meters every 15 minutes.
+The differences between consumption values are stored in the hvac_power table of the elpowerdb
+database using the power_update user
