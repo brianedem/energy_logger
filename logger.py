@@ -47,9 +47,9 @@ sEdge = os.path.join(modbus_solar, 'sEdge.py')
 # readings are from either Peacefair devices or from the solar inverter
 # first read the Peacefair devices via HTTP/JSON
 peacefair_list = {
-    'waterheater':  'waterheater.lan',
-    'condenser':    'condenser.lan',
-    'evaporator':   'evaporator.lan',
+    'waterheater':  'waterheater',  # allows padding with .lan or .local, if needed
+    'condenser':    'condenser',
+    'evaporator':   'evaporator',
 }
 
 # peacefair meters read via a picow are read individually via HTTP
@@ -81,7 +81,7 @@ sedge_list = {
     }
 
 # the solar inverter provides several meters that can read in a single query
-solar_edge_inverter_address = '192.168.12.186'          # TODO move to command line parameter?
+solar_edge_inverter_address = 'solaredgeinv-75102275'
 try:
     system = se.sEdge(solar_edge_inverter_address, 1502)
 except RuntimeError as e:
